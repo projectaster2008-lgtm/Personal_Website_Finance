@@ -1,0 +1,19 @@
+node_modules/
+dist/
+build/
+.next/
+
+.env
+.env.*
+!.env.example
+
+*.log
+npm-debug.log*
+.DS_Store
+.idea/
+.vscode/
+coverage/
+*.tsbuildinfo
+
+# Prisma generates into node_modules; migrations ARE committed.
+prisma/.env

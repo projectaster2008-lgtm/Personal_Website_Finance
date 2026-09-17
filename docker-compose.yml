@@ -1,0 +1,23 @@
+# Postgres for local development. Nothing else runs in Docker — the app itself
+# is easier to iterate on with npm run dev.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pfos-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pfos
+      POSTGRES_PASSWORD: pfos
+      POSTGRES_DB: pfos
+    ports:
+      - '5432:5432'
+    volumes:
+      - pfos-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pfos']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pfos-data:

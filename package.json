@@ -1,0 +1,28 @@
+{
+  "name": "personal-finance-os",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A personal financial operating system rebuilt from a spreadsheet: one transaction in, every statement updated.",
+  "workspaces": [
+    "packages/*",
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace @pfos/shared",
+    "dev:server": "npm run dev --workspace @pfos/server",
+    "dev:web": "npm run dev --workspace @pfos/web",
+    "dev": "npm run build:shared && concurrently \"npm:dev:server\" \"npm:dev:web\"",
+    "setup": "npm install && npm run build:shared && npm run prisma:generate --workspace @pfos/server",
+    "db:migrate": "npm run prisma:migrate --workspace @pfos/server",
+    "db:seed": "npm run db:seed --workspace @pfos/server",
+    "test": "npm run test --workspace @pfos/server",
+    "typecheck": "npm run typecheck --workspace @pfos/shared && npm run typecheck --workspace @pfos/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

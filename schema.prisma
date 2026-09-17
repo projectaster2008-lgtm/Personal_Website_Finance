@@ -1,0 +1,466 @@
+// Personal Finance OS — database schema
+//
+// Derived from Personal_Financial_Tracker_Fixed.xlsx. See docs/WORKBOOK_MAPPING.md
+// for the sheet-by-sheet derivation.
+//
+// THREE RULES THIS SCHEMA ENFORCES
+//
+// 1. Money is an integer. Every `*Minor` column is a count of minor units
+//    (centavos). There is no Float anywhere in this file, on purpose.
+//
+// 2. `LedgerEntry` is the single source of truth. `Transaction` is the
+//    user-facing record; entries are what every report sums. A transfer has two
+//    entries that cancel, which is why moving money between your own accounts
+//    cannot change total cash.
+//
+// 3. Every row belongs to a user. `userId` is on every table including
+//    LedgerEntry (denormalised deliberately) so row-level isolation is a single
+//    indexed predicate on the hot path and can never be forgotten in a join.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/* --------------------------------------------------------------- enums --- */
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum CategoryKind {
+  INCOME
+  EXPENSE
+  INTERNAL
+}
+
+enum AccountType {
+  BANK
+  EWALLET
+  SAVINGS
+  CASH
+  OTHER
+}
+
+enum AccountRole {
+  CONVENIENCE_WALLET
+  PROFESSIONAL_ANCHOR
+  TRANSIT_STATION
+  VAULT
+  DAILY_WALLET
+  OTHER
+}
+
+enum LedgerLeg {
+  PRIMARY
+  TRANSFER_OUT
+  TRANSFER_IN
+  FEE
+}
+
+enum Direction {
+  IN
+  OUT
+}
+
+enum BudgetPeriod {
+  MONTHLY
+  CUSTOM
+}
+
+enum Frequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+/* ---------------------------------------------------------------- user --- */
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  name         String?
+  // OAuth (Google sign-in) — password may be null for OAuth-only users.
+  googleId     String?  @unique
+
+  currency     String   @default("PHP")
+  timezone     String   @default("Asia/Manila")
+  locale       String   @default("en-PH")
+  weekStartsOn Int      @default(1) // 1 = Monday, matching the weekly reconciliation
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts          Account[]
+  categories        Category[]
+  transactions      Transaction[]
+  ledgerEntries     LedgerEntry[]
+  budgets           Budget[]
+  goals             Goal[]
+  recurringRules    RecurringRule[]
+  liabilities       Liability[]
+  reconciliations   Reconciliation[]
+  adjustments       NetWorthAdjustment[]
+  attachments       Attachment[]
+  refreshTokens     RefreshToken[]
+  passwordResets    PasswordReset[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  // Only the hash is stored; a stolen database row cannot be replayed as a token.
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+/* ------------------------------------------------------------ accounts --- */
+
+model Account {
+  id                 String      @id @default(cuid())
+  userId             String
+  name               String
+  type               AccountType
+  role               AccountRole @default(OTHER)
+  notes              String?
+  openingBalanceMinor Int        @default(0)
+  openingBalanceDate DateTime?   @db.Date
+  // Excluded accounts still track balances but stay out of total cash / net worth.
+  includeInNetWorth  Boolean     @default(true)
+  isActive           Boolean     @default(true)
+  // Seeded workbook accounts are protected from deletion, not from editing.
+  isSystem           Boolean     @default(false)
+  sortOrder          Int         @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntries   LedgerEntry[]
+  transactionsAsAccount Transaction[] @relation("TxAccount")
+  transactionsAsFrom    Transaction[] @relation("TxFromAccount")
+  transactionsAsTo      Transaction[] @relation("TxToAccount")
+  goals           Goal[]
+  recurringAsAccount RecurringRule[] @relation("RuleAccount")
+  recurringAsFrom    RecurringRule[] @relation("RuleFromAccount")
+  recurringAsTo      RecurringRule[] @relation("RuleToAccount")
+  reconciliations Reconciliation[]
+
+  @@unique([userId, name])
+  @@index([userId, isActive])
+  @@map("accounts")
+}
+
+/* ---------------------------------------------------------- categories --- */
+
+model Category {
+  id          String       @id @default(cuid())
+  userId      String
+  name        String
+  kind        CategoryKind
+  description String?
+  color       String?
+  icon        String?
+  isActive    Boolean      @default(true)
+  isSystem    Boolean      @default(false)
+  sortOrder   Int          @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions  Transaction[]
+  ledgerEntries LedgerEntry[]
+  budgets       Budget[]
+  recurringRules RecurringRule[]
+
+  @@unique([userId, name])
+  @@index([userId, kind])
+  @@map("categories")
+}
+
+/* -------------------------------------------------------- transactions --- */
+
+model Transaction {
+  id          String          @id @default(cuid())
+  userId      String
+  // Stored as a DATE, not a timestamp: a transaction happens on a day in the
+  // user's timezone. Storing an instant reintroduces the off-by-one-day bug at
+  // every month boundary.
+  date        DateTime        @db.Date
+  type        TransactionType
+  description String
+  amountMinor Int
+  notes       String?
+  merchant    String?
+  tags        String[]        @default([])
+  externalRef String?
+
+  // Income / expense
+  accountId  String?
+  categoryId String?
+
+  // Transfer
+  fromAccountId String?
+  toAccountId   String?
+  feeMinor      Int     @default(0)
+
+  recurringRuleId String?
+  // Stable hash of (date, amount, description, account) used to block duplicate imports.
+  importFingerprint String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account     Account?       @relation("TxAccount", fields: [accountId], references: [id], onDelete: Restrict)
+  category    Category?      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  fromAccount Account?       @relation("TxFromAccount", fields: [fromAccountId], references: [id], onDelete: Restrict)
+  toAccount   Account?       @relation("TxToAccount", fields: [toAccountId], references: [id], onDelete: Restrict)
+  recurringRule RecurringRule? @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
+
+  // Entries are owned by the transaction: rewriting a transaction deletes and
+  // regenerates them inside one database transaction.
+  entries     LedgerEntry[]
+  attachments Attachment[]
+
+  @@index([userId, date])
+  @@index([userId, type, date])
+  @@index([userId, categoryId, date])
+  @@index([userId, accountId, date])
+  @@unique([userId, importFingerprint])
+  @@map("transactions")
+}
+
+/* -------------------------------------------------------- ledger entry --- */
+
+/// One side of one transaction. THE source of truth for every report.
+model LedgerEntry {
+  id            String    @id @default(cuid())
+  userId        String
+  transactionId String
+  accountId     String
+  categoryId    String?
+
+  date        DateTime  @db.Date
+  amountMinor Int       // always positive; sign lives in `direction`
+  direction   Direction
+  leg         LedgerLeg
+  /// True only for the two legs of a transfer. Drives exclusion from the
+  /// Income Statement — the structural replacement for the workbook's
+  /// "Internal Transfer" pseudo-category.
+  isInternal  Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  account     Account     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  category    Category?   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  // The four indexes that keep reports fast at thousands of rows per user.
+  @@index([userId, date])
+  @@index([userId, accountId, date])
+  @@index([userId, categoryId, date])
+  @@index([userId, isInternal, date])
+  @@index([transactionId])
+  @@map("ledger_entries")
+}
+
+/* --------------------------------------------------------------- plans --- */
+
+model Budget {
+  id          String       @id @default(cuid())
+  userId      String
+  categoryId  String
+  amountMinor Int
+  period      BudgetPeriod @default(MONTHLY)
+  startDate   DateTime     @db.Date
+  endDate     DateTime?    @db.Date
+  rollover    Boolean      @default(false)
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  // One budget per category per period start. Two budgets for October Food would
+  // make "remaining" ambiguous.
+  @@unique([userId, categoryId, startDate])
+  @@index([userId, startDate])
+  @@map("budgets")
+}
+
+model Goal {
+  id                String    @id @default(cuid())
+  userId            String
+  name              String
+  targetAmountMinor Int
+  targetDate        DateTime? @db.Date
+  /// When set, progress is READ from this account's balance. No stored amount,
+  /// so a transfer into the account moves the goal with zero extra input.
+  accountId         String?
+  manualAmountMinor Int       @default(0)
+  notes             String?
+  isArchived        Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isArchived])
+  @@map("goals")
+}
+
+model RecurringRule {
+  id          String          @id @default(cuid())
+  userId      String
+  type        TransactionType
+  description String
+  amountMinor Int
+  categoryId  String?
+  accountId   String?
+  fromAccountId String?
+  toAccountId   String?
+
+  frequency Frequency
+  interval  Int       @default(1)
+  /// Day of month (1-31) for MONTHLY/QUARTERLY/YEARLY, weekday (0-6) for WEEKLY.
+  anchorDay Int?
+  startDate DateTime  @db.Date
+  endDate   DateTime? @db.Date
+  /// Date of the last occurrence actually posted, so a worker cannot double-post.
+  lastPostedDate DateTime? @db.Date
+  autoPost  Boolean   @default(false)
+  isActive  Boolean   @default(true)
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  account     Account?  @relation("RuleAccount", fields: [accountId], references: [id], onDelete: SetNull)
+  fromAccount Account?  @relation("RuleFromAccount", fields: [fromAccountId], references: [id], onDelete: SetNull)
+  toAccount   Account?  @relation("RuleToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
+  transactions Transaction[]
+
+  @@index([userId, isActive])
+  @@map("recurring_rules")
+}
+
+/* ---------------------------------------------------- liabilities etc. --- */
+
+model Liability {
+  id           String    @id @default(cuid())
+  userId       String
+  name         String
+  balanceMinor Int
+  creditor     String?
+  dueDate      DateTime? @db.Date
+  notes        String?
+  isSettled    Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isSettled])
+  @@map("liabilities")
+}
+
+model Reconciliation {
+  id                 String   @id @default(cuid())
+  userId             String
+  accountId          String
+  /// Monday of the reconciliation week.
+  weekOf             DateTime @db.Date
+  /// Only the bank-app figure is stored. The ledger side is always recomputed,
+  /// because a stored ledger balance can go stale the moment a transaction is edited.
+  actualBalanceMinor Int
+  notes              String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, accountId, weekOf])
+  @@index([userId, weekOf])
+  @@map("reconciliations")
+}
+
+model NetWorthAdjustment {
+  id          String   @id @default(cuid())
+  userId      String
+  date        DateTime @db.Date
+  amountMinor Int
+  /// Required. An unexplained adjustment is indistinguishable from a bug.
+  reason      String
+  notes       String?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("net_worth_adjustments")
+}
+
+model Attachment {
+  id            String  @id @default(cuid())
+  userId        String
+  transactionId String?
+  /// Object-storage key, never a public URL. URLs are signed on demand.
+  storageKey    String
+  filename      String
+  mimeType      String
+  sizeBytes     Int
+
+  createdAt DateTime @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("attachments")
+}
