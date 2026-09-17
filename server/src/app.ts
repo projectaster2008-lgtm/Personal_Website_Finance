@@ -18,10 +18,15 @@ export function createApp() {
   // Behind a proxy (Railway, Fly, Render) so rate limiting sees the real IP.
   app.set('trust proxy', 1);
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
   app.use(
     cors({
-      origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()),
+      origin: true,
       credentials: true,
     }),
   );
@@ -34,8 +39,7 @@ export function createApp() {
   });
 
   app.use('/api', apiLimiter, router);
-
-  app.use(notFoundHandler);
+  app.use('/api', notFoundHandler);
   app.use(errorHandler);
 
   return app;

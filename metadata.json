@@ -1,0 +1,8 @@
+{
+  "name": "Personal Finance OS",
+  "description": "A personal financial operating system rebuilt from a spreadsheet with automated ledger reconciliation, financial statements, and dashboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

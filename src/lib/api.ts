@@ -45,7 +45,7 @@ import type {
   UserDto,
 } from '@pfos/shared';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api';
+const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 /** Thrown for any non-2xx response. `code` mirrors the server's error code. */
 export class ApiRequestError extends Error {

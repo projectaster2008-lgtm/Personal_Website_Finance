@@ -7,13 +7,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@pfos/shared': fileURLToPath(new URL('./packages/shared/src/index.ts', import.meta.url)),
     },
   },
   server: {
-    port: 5173,
-    // Lets the frontend call /api during development without CORS preflight noise.
-    proxy: {
-      '/api': { target: 'http://localhost:4000', changeOrigin: true },
-    },
+    host: '0.0.0.0',
+    port: 3000,
   },
 });
