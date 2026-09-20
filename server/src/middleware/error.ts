@@ -1,5 +1,4 @@
 import type { NextFunction, Request, Response } from 'express';
-import { Prisma } from '@prisma/client';
 import { AppError } from '../lib/errors.js';
 import { PostingError } from '../domain/engine/postings.js';
 import { isProduction } from '../config/env.js';
@@ -25,18 +24,22 @@ export function errorHandler(
     return;
   }
 
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === 'P2002') {
+  // Duck-typed rather than `instanceof Prisma.PrismaClientKnownRequestError`.
+  // Importing the Prisma namespace here would crash the process whenever the
+  // client has not been generated, and the codes below are stable API.
+  const prismaError = asPrismaError(error);
+  if (prismaError) {
+    if (prismaError.code === 'P2002') {
       res.status(409).json({
-        error: { code: 'DUPLICATE', message: 'That already exists', details: error.meta },
+        error: { code: 'DUPLICATE', message: 'That already exists', details: prismaError.meta },
       });
       return;
     }
-    if (error.code === 'P2003' || error.code === 'P2025') {
+    if (prismaError.code === 'P2003' || prismaError.code === 'P2025') {
       res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Referenced record not found' } });
       return;
     }
-    if (error.code === 'P2014') {
+    if (prismaError.code === 'P2014') {
       res.status(409).json({
         error: {
           code: 'IN_USE',
@@ -65,6 +68,14 @@ export function errorHandler(
       details: isProduction ? undefined : { raw: String(error) },
     },
   });
+}
+
+/** Recognises a Prisma known-request error by shape, not by class identity. */
+function asPrismaError(error: unknown): { code: string; meta?: unknown } | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const candidate = error as { code?: unknown; clientVersion?: unknown; meta?: unknown };
+  if (typeof candidate.code !== 'string' || !/^P\d{4}$/.test(candidate.code)) return null;
+  return { code: candidate.code, meta: candidate.meta };
 }
 
 export function notFoundHandler(_req: Request, res: Response): void {

@@ -19,8 +19,8 @@ const schema = z.object({
 
   CORS_ORIGIN: z.string().default('*'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().default(60_000),
-  RATE_LIMIT_MAX: z.coerce.number().int().default(300),
-  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().default(10),
+  RATE_LIMIT_MAX: z.coerce.number().int().default(1000),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().default(100),
 
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),

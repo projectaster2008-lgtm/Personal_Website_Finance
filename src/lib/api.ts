@@ -105,7 +105,9 @@ async function attemptRefresh(): Promise<boolean> {
   // Share one in-flight refresh across every request that got a 401.
   refreshInFlight ??= (async () => {
     try {
-      const response = await fetch(`${BASE_URL}/auth/refresh`, {
+      const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:3000';
+      const refreshUrl = new URL(`${BASE_URL}/auth/refresh`, origin).toString();
+      const response = await fetch(refreshUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
@@ -136,7 +138,8 @@ interface RequestOptions {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, query, raw = false, retry = true } = options;
 
-  const url = new URL(`${BASE_URL}${path}`);
+  const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:3000';
+  const url = new URL(`${BASE_URL}${path}`, origin);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined && value !== '') url.searchParams.set(key, String(value));
   }

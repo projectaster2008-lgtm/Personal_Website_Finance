@@ -24,16 +24,37 @@ import {
 const enumOf = <T extends Record<string, string>>(obj: T) =>
   z.enum(Object.values(obj) as [T[keyof T], ...T[keyof T][]]);
 
-/** Accepts "1234.50", 1234.5 or explicit minor units, always yields minor units. */
+/**
+ * Money on the wire is ALWAYS an integer count of minor units (centavos).
+ * `12345` means PHP 123.45. A numeric string is accepted so query parameters
+ * work, but a fractional value is REJECTED rather than rounded.
+ *
+ * This schema deliberately does NOT convert major units to minor. An earlier
+ * version multiplied its input by 100, which meant a field named `amountMinor`
+ * silently accepted major units and stored 100x the intended amount. Converting
+ * what a human typed into minor units is the client's job — use `toMinor()`
+ * from `money.ts` in the form layer, and send the integer it returns.
+ */
 export const amountMinorSchema = z
   .union([z.number(), z.string()])
   .transform((value, ctx) => {
-    const raw = typeof value === 'number' ? value : Number(String(value).replace(/[^0-9.\-]/g, ''));
+    // Strip grouping separators and currency symbols, keep sign and decimal point
+    // so a fractional input is still detected rather than silently truncated.
+    const raw =
+      typeof value === 'number' ? value : Number(String(value).replace(/[^0-9.\-]/g, ''));
+
     if (!Number.isFinite(raw)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Amount must be a number' });
       return z.NEVER;
     }
-    return Math.round(raw * 100);
+    if (!Number.isInteger(raw)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Amounts are sent in centavos, so they must be whole numbers (12345 = 123.45)',
+      });
+      return z.NEVER;
+    }
+    return raw;
   })
   .pipe(z.number().int());
 
