@@ -13,8 +13,10 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { PeriodPreset, UserDto } from '@pfos/shared';
+import { CheckCircle2, Plus, X } from 'lucide-react';
 import { api, ApiRequestError, session } from './lib/api';
 import { money, percent } from './lib/format';
+import { AddTransactionModal } from './components/AddTransactionModal';
 
 export default function App() {
   const [user, setUser] = useState<UserDto | null>(null);
@@ -119,6 +121,13 @@ const PERIODS: { value: PeriodPreset; label: string }[] = [
 
 function Dashboard({ user, onSignOut }: { user: UserDto; onSignOut: () => void }) {
   const [preset, setPreset] = useState<PeriodPreset>('THIS_MONTH');
+  const [isAddTxOpen, setIsAddTxOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function handleSuccess(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
+  }
 
   // ONE query drives every panel, so no two cards can show different windows.
   const { data, isLoading, error } = useQuery({
@@ -129,17 +138,25 @@ function Dashboard({ user, onSignOut }: { user: UserDto; onSignOut: () => void }
   const fmt = (minor: number) => money(minor, user.currency);
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <header className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-5xl p-6 relative">
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Personal Finance OS</h1>
           <p className="text-sm text-slate-500">{data?.period.label ?? ' '}</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            id="open-add-transaction-btn"
+            onClick={() => setIsAddTxOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            + Add Transaction
+          </button>
           <select
             value={preset}
             onChange={(e) => setPreset(e.target.value as PeriodPreset)}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm bg-white"
           >
             {PERIODS.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
@@ -150,6 +167,32 @@ function Dashboard({ user, onSignOut }: { user: UserDto; onSignOut: () => void }
           </button>
         </div>
       </header>
+
+      {toast && (
+        <div
+          id="toast-notification"
+          role="status"
+          className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl ring-1 ring-white/10"
+        >
+          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+          <span>{toast}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="ml-2 text-slate-400 hover:text-white"
+            aria-label="Dismiss toast"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      <AddTransactionModal
+        isOpen={isAddTxOpen}
+        onClose={() => setIsAddTxOpen(false)}
+        onSuccess={handleSuccess}
+        currency={user.currency}
+      />
 
       {isLoading && <p className="text-slate-500">Loading your finances…</p>}
       {error && <p className="text-red-600">Could not load the dashboard.</p>}

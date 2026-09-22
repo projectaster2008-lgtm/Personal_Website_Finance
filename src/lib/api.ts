@@ -45,7 +45,28 @@ import type {
   UserDto,
 } from '@pfos/shared';
 
-const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+function resolveBaseUrl(): string {
+  const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  if (!envUrl) return '/api';
+
+  // If in a browser environment and the page is served from a remote origin,
+  // do not point to localhost or an invalid client-side host.
+  if (typeof window !== 'undefined' && window.location) {
+    const isLocalhostHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalhostHost && (envUrl.includes('localhost') || envUrl.includes('127.0.0.1'))) {
+      return '/api';
+    }
+  }
+
+  // Pre-migration port 4000
+  if (envUrl.includes(':4000')) {
+    return '/api';
+  }
+
+  return envUrl.replace(/\/+$/, '');
+}
+
+const BASE_URL = resolveBaseUrl();
 
 /** Thrown for any non-2xx response. `code` mirrors the server's error code. */
 export class ApiRequestError extends Error {
@@ -139,7 +160,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const { method = 'GET', body, query, raw = false, retry = true } = options;
 
   const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:3000';
-  const url = new URL(`${BASE_URL}${path}`, origin);
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const url = new URL(`${BASE_URL}${cleanPath}`, origin);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined && value !== '') url.searchParams.set(key, String(value));
   }
