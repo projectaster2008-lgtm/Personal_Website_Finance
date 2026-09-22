@@ -130,6 +130,7 @@ async function attemptRefresh(): Promise<boolean> {
       const refreshUrl = new URL(`${BASE_URL}/auth/refresh`, origin).toString();
       const response = await fetch(refreshUrl, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
       });
@@ -168,6 +169,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   const response = await fetch(url.toString(), {
     method,
+    credentials: 'include',
     headers: {
       ...(body ? { 'Content-Type': 'application/json' } : {}),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -182,17 +184,32 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as ApiError | null;
+    const contentType = response.headers.get('content-type');
+    const isJson = contentType && contentType.includes('application/json');
+    const payload = isJson ? ((await response.json().catch(() => null)) as ApiError | null) : null;
+    const fallbackMessage = response.status === 404
+      ? 'Backend endpoint not found (404).'
+      : response.statusText || 'Request failed';
     throw new ApiRequestError(
       response.status,
-      payload?.error.code ?? 'UNKNOWN',
-      payload?.error.message ?? response.statusText,
-      payload?.error.details,
+      payload?.error?.code ?? 'REQUEST_FAILED',
+      payload?.error?.message ?? fallbackMessage,
+      payload?.error?.details,
     );
   }
 
   if (response.status === 204) return undefined as T;
   if (raw) return (await response.blob()) as T;
+
+  const contentType = response.headers.get('content-type');
+  if (contentType && !contentType.includes('application/json')) {
+    throw new ApiRequestError(
+      response.status,
+      'INVALID_RESPONSE',
+      'Received HTML or unexpected response instead of JSON. Ensure backend routes are reached.',
+    );
+  }
+
   return (await response.json()) as T;
 }
 
@@ -208,8 +225,13 @@ export const api = {
   register: (body: { email: string; password: string; name?: string; seedDefaults?: boolean }) =>
     request<AuthResponse>('/auth/register', { method: 'POST', body }).then(tap(session.set)),
 
-  login: (email: string, password: string) =>
-    request<AuthResponse>('/auth/login', { method: 'POST', body: { email, password } }).then(
+  login: (email: string, password: string, name?: string) =>
+    request<AuthResponse>('/auth/login', { method: 'POST', body: { email, password, name } }).then(
+      tap(session.set),
+    ),
+
+  demoLogin: (email?: string, name?: string) =>
+    request<AuthResponse>('/auth/demo', { method: 'POST', body: { email, name } }).then(
       tap(session.set),
     ),
 

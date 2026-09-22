@@ -19,7 +19,7 @@ import { createInMemoryPrisma } from './inMemoryPrisma.js';
 const nodeRequire =
   typeof require === 'function'
     ? require
-    : createRequire(path.join(process.cwd(), 'package.json'));
+    : createRequire(import.meta.url);
 
 const globalForPrisma = globalThis as unknown as { prisma?: unknown };
 
@@ -51,7 +51,4 @@ function initializePrisma(): unknown {
  * Every call site is still typed by the service layer above it.
  */
 export const prisma: any = globalForPrisma.prisma ?? initializePrisma();
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+globalForPrisma.prisma = prisma;

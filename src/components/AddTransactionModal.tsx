@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CategoryKind, toMinor, TransactionType } from '@pfos/shared';
+import { CategoryKind, toMinor, TransactionType, AccountType, AccountRole } from '@pfos/shared';
 import { X, ArrowRightLeft, TrendingDown, TrendingUp, Loader2 } from 'lucide-react';
 import { api, ApiRequestError } from '../lib/api';
+import { ExtensibleCombobox } from './ExtensibleCombobox';
 
 type TabType = 'EXPENSE' | 'INCOME' | 'TRANSFER';
 
@@ -34,7 +35,7 @@ export function AddTransactionModal({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch accounts and categories
+  // Fetch accounts and categories (active only)
   const { data: accounts = [], isLoading: loadingAccounts } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => api.listAccounts(false),
@@ -47,12 +48,67 @@ export function AddTransactionModal({
     enabled: isOpen,
   });
 
-  // Filter categories based on active tab
+  // Filter categories based on active tab and ensure only active categories are used
   const filteredCategories = categories.filter((c) => {
+    if (c.isActive === false) return false;
     if (tab === 'INCOME') return c.kind === CategoryKind.INCOME;
     if (tab === 'EXPENSE') return c.kind === CategoryKind.EXPENSE;
     return true;
   });
+
+  // Filter accounts to active only
+  const activeAccounts = accounts.filter((a) => a.isActive !== false);
+
+  const accountComboboxItems = activeAccounts.map((a) => ({
+    id: a.id,
+    name: a.name,
+    badge: a.type !== 'OTHER' ? a.type : undefined,
+  }));
+
+  const categoryComboboxItems = filteredCategories.map((c) => ({
+    id: c.id,
+    name: c.name,
+  }));
+
+  const handleCreateCategory = async (name: string): Promise<string | void> => {
+    const kind = tab === 'INCOME' ? CategoryKind.INCOME : CategoryKind.EXPENSE;
+    try {
+      const newCat = await api.createCategory({ name, kind, isActive: true });
+      await queryClient.invalidateQueries({ queryKey: ['categories'] });
+      setCategoryId(newCat.id);
+      return newCat.id;
+    } catch (err) {
+      if (err instanceof ApiRequestError) {
+        setError(err.message);
+      } else {
+        setError('Failed to create category');
+      }
+    }
+  };
+
+  const handleCreateAccount = async (
+    name: string,
+    extra?: { accountType?: AccountType },
+  ): Promise<string | void> => {
+    try {
+      const newAcc = await api.createAccount({
+        name,
+        type: extra?.accountType || AccountType.OTHER,
+        role: AccountRole.OTHER,
+        openingBalanceMinor: 0,
+        includeInNetWorth: true,
+        isActive: true,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      return newAcc.id;
+    } catch (err) {
+      if (err instanceof ApiRequestError) {
+        setError(err.message);
+      } else {
+        setError('Failed to create account');
+      }
+    }
+  };
 
   // Reset/seed default dropdown selections when data loads or tab changes
   useEffect(() => {
@@ -318,124 +374,83 @@ export function AddTransactionModal({
           {/* Income & Expense Fields: Category & Account */}
           {tab !== 'TRANSFER' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="tx-category" className="block text-sm font-medium text-slate-700 mb-1">
-                  Category
-                </label>
-                <select
-                  id="tx-category"
-                  value={categoryId}
-                  onChange={(e) => {
-                    setCategoryId(e.target.value);
-                    if (error) setError(null);
-                  }}
-                  disabled={loadingCategories}
-                  required
-                  className="block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-slate-900 focus:outline-hidden text-sm bg-white"
-                >
-                  {loadingCategories ? (
-                    <option value="">Loading categories…</option>
-                  ) : filteredCategories.length === 0 ? (
-                    <option value="">No categories available</option>
-                  ) : (
-                    filteredCategories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
+              <ExtensibleCombobox
+                id="tx-category"
+                label="Category"
+                value={categoryId}
+                items={categoryComboboxItems}
+                onSelect={(id) => {
+                  setCategoryId(id);
+                  if (error) setError(null);
+                }}
+                onCreate={handleCreateCategory}
+                type="category"
+                kindLabel={tab === 'INCOME' ? 'Income' : 'Expense'}
+                disabled={loadingCategories}
+              />
 
-              <div>
-                <label htmlFor="tx-account" className="block text-sm font-medium text-slate-700 mb-1">
-                  Account
-                </label>
-                <select
-                  id="tx-account"
-                  value={accountId}
-                  onChange={(e) => {
-                    setAccountId(e.target.value);
-                    if (error) setError(null);
-                  }}
-                  disabled={loadingAccounts}
-                  required
-                  className="block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-slate-900 focus:outline-hidden text-sm bg-white"
-                >
-                  {loadingAccounts ? (
-                    <option value="">Loading accounts…</option>
-                  ) : accounts.length === 0 ? (
-                    <option value="">No accounts available</option>
-                  ) : (
-                    accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
+              <ExtensibleCombobox
+                id="tx-account"
+                label="Account"
+                value={accountId}
+                items={accountComboboxItems}
+                onSelect={(id) => {
+                  setAccountId(id);
+                  if (error) setError(null);
+                }}
+                onCreate={async (name, extra) => {
+                  const id = await handleCreateAccount(name, extra);
+                  if (id) {
+                    setAccountId(id);
+                    return id;
+                  }
+                }}
+                type="account"
+                disabled={loadingAccounts}
+              />
             </div>
           ) : (
             /* Transfer Fields: From Account & To Account */
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="tx-from-account" className="block text-sm font-medium text-slate-700 mb-1">
-                  From Account
-                </label>
-                <select
-                  id="tx-from-account"
-                  value={fromAccountId}
-                  onChange={(e) => {
-                    setFromAccountId(e.target.value);
-                    if (error) setError(null);
-                  }}
-                  disabled={loadingAccounts}
-                  required
-                  className="block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-slate-900 focus:outline-hidden text-sm bg-white"
-                >
-                  {loadingAccounts ? (
-                    <option value="">Loading accounts…</option>
-                  ) : accounts.length === 0 ? (
-                    <option value="">No accounts available</option>
-                  ) : (
-                    accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
+              <ExtensibleCombobox
+                id="tx-from-account"
+                label="From Account"
+                value={fromAccountId}
+                items={accountComboboxItems}
+                onSelect={(id) => {
+                  setFromAccountId(id);
+                  if (error) setError(null);
+                }}
+                onCreate={async (name, extra) => {
+                  const id = await handleCreateAccount(name, extra);
+                  if (id) {
+                    setFromAccountId(id);
+                    return id;
+                  }
+                }}
+                type="account"
+                disabled={loadingAccounts}
+              />
 
-              <div>
-                <label htmlFor="tx-to-account" className="block text-sm font-medium text-slate-700 mb-1">
-                  To Account
-                </label>
-                <select
-                  id="tx-to-account"
-                  value={toAccountId}
-                  onChange={(e) => {
-                    setToAccountId(e.target.value);
-                    if (error) setError(null);
-                  }}
-                  disabled={loadingAccounts}
-                  required
-                  className="block w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900 focus:border-slate-900 focus:outline-hidden text-sm bg-white"
-                >
-                  {loadingAccounts ? (
-                    <option value="">Loading accounts…</option>
-                  ) : accounts.length === 0 ? (
-                    <option value="">No accounts available</option>
-                  ) : (
-                    accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
+              <ExtensibleCombobox
+                id="tx-to-account"
+                label="To Account"
+                value={toAccountId}
+                items={accountComboboxItems}
+                onSelect={(id) => {
+                  setToAccountId(id);
+                  if (error) setError(null);
+                }}
+                onCreate={async (name, extra) => {
+                  const id = await handleCreateAccount(name, extra);
+                  if (id) {
+                    setToAccountId(id);
+                    return id;
+                  }
+                }}
+                type="account"
+                disabled={loadingAccounts}
+              />
             </div>
           )}
 

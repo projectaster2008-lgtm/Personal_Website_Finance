@@ -22,7 +22,7 @@ import type {
   IntegrityReport,
 } from '@pfos/shared';
 import type { AccountView, LedgerEntryView } from '../ledger.js';
-import { effectOf } from '../ledger.js';
+import { effectOf, inPeriod } from '../ledger.js';
 import { computeAccountBalances } from './balances.js';
 
 export interface IntegrityInput {
@@ -53,16 +53,25 @@ export function checkIntegrity(input: IntegrityInput): IntegrityReport {
     });
   }
 
-  /* 2. Cash flow net change vs net income ---------------------------------- */
-  if (input.cashFlow.netChangeInCashMinor !== input.incomeStatement.netIncomeMinor) {
+  /* 2. Cash flow net change vs net income + capital contributions --------- */
+  const capitalInPeriod = input.entries
+    .filter(
+      (e) =>
+        (e.transactionType === 'CAPITAL' || e.categoryName === "Owner's Capital") &&
+        inPeriod(e.date, input.cashFlow.period.from, input.cashFlow.period.to),
+    )
+    .reduce((s, e) => s + (e.direction === 'IN' ? e.amountMinor : -e.amountMinor), 0);
+
+  const expectedCashChange = input.incomeStatement.netIncomeMinor + capitalInPeriod;
+  if (input.cashFlow.netChangeInCashMinor !== expectedCashChange) {
     issues.push({
       code: 'CASH_FLOW_MISMATCH',
       severity: 'ERROR',
       message:
-        'Net change in cash does not equal net income for the period. An entry may be missing a matching leg.',
+        'Net change in cash does not equal net income plus capital movements for the period. An entry may be missing a matching leg.',
       detail: {
         netChangeInCashMinor: input.cashFlow.netChangeInCashMinor,
-        netIncomeMinor: input.incomeStatement.netIncomeMinor,
+        expectedMinor: expectedCashChange,
       },
     });
   }

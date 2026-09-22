@@ -53,14 +53,13 @@ export function computeCashFlow(
 
   const openingBalances = computeAccountBalances(accounts, entries, previousDay(period.from));
   const closingBalances = computeAccountBalances(accounts, entries, period.to);
-  let openingCashMinor = computeTotalCash(openingBalances);
+  const openingCashMinor = computeTotalCash(openingBalances);
   const closingCashMinor = computeTotalCash(closingBalances);
 
-  // Capital contributed on or before period.from that represents starting owner capital:
-  const capitalAtStart = entries
-    .filter((e) => (e.transactionType === 'CAPITAL' || e.categoryName === "Owner's Capital") && e.date <= period.from)
-    .reduce((s, e) => s + e.amountMinor, 0);
-  openingCashMinor += capitalAtStart;
+  // Capital contributed or withdrawn during the current period:
+  const capitalInPeriod = entries
+    .filter((e) => (e.transactionType === 'CAPITAL' || e.categoryName === "Owner's Capital") && inPeriod(e.date, period.from, period.to))
+    .reduce((s, e) => s + (e.direction === 'IN' ? e.amountMinor : -e.amountMinor), 0);
 
   const totalMovedToSavingsMinor = lines.reduce((s, l) => s + l.movedInMinor, 0);
 
@@ -72,7 +71,7 @@ export function computeCashFlow(
       netOperatingMinor: statement.netIncomeMinor,
     },
     savingActivities: { lines, totalMovedToSavingsMinor },
-    netChangeInCashMinor: statement.netIncomeMinor,
+    netChangeInCashMinor: statement.netIncomeMinor + capitalInPeriod,
     openingCashMinor,
     closingCashMinor,
     explanation:
@@ -187,11 +186,12 @@ export function computeChangesInNetWorth(
     .filter((a) => strictlyBefore(a.date, period.from))
     .reduce((s, a) => s + a.amountMinor, 0);
 
-  const capitalAtStart = entries
-    .filter((e) => (e.transactionType === 'CAPITAL' || e.categoryName === "Owner's Capital") && e.date <= period.from)
-    .reduce((s, e) => s + e.amountMinor, 0);
+  const beginningNetWorthMinor = openingCash - openingLiabilities + priorAdjustments;
 
-  const beginningNetWorthMinor = openingCash + capitalAtStart - openingLiabilities + priorAdjustments;
+  // Capital contributed or withdrawn during the current period:
+  const capitalInPeriod = entries
+    .filter((e) => (e.transactionType === 'CAPITAL' || e.categoryName === "Owner's Capital") && inPeriod(e.date, period.from, period.to))
+    .reduce((s, e) => s + (e.direction === 'IN' ? e.amountMinor : -e.amountMinor), 0);
 
   const statement = computeIncomeStatement(entries, categories, period);
 
@@ -207,7 +207,7 @@ export function computeChangesInNetWorth(
     period,
     beginningNetWorthMinor,
     netIncomeMinor: statement.netIncomeMinor,
-    adjustmentsMinor: adjustmentsMinor - newLiabilities,
+    adjustmentsMinor: adjustmentsMinor - newLiabilities + capitalInPeriod,
     adjustments: periodAdjustments.map((a) => ({
       id: a.id,
       date: a.date,
@@ -215,7 +215,7 @@ export function computeChangesInNetWorth(
       reason: a.reason,
     })),
     endingNetWorthMinor:
-      beginningNetWorthMinor + statement.netIncomeMinor + adjustmentsMinor - newLiabilities,
+      beginningNetWorthMinor + statement.netIncomeMinor + capitalInPeriod + adjustmentsMinor - newLiabilities,
   };
 }
 

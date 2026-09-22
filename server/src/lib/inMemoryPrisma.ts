@@ -357,11 +357,12 @@ export class InMemoryDatabase {
 }
 
 export function seedDemoData(db: InMemoryDatabase) {
-  seedRoseCraftUser(db, 'user_demo_aster', 'demo@pfos.local', 'RoseCraft Tumblers');
+  seedRoseCraftUser(db, 'user_demo_aster', 'demo@pfos.local', 'Solvra User');
 }
 
 export function seedRoseCraftData(db: InMemoryDatabase) {
-  seedRoseCraftUser(db, 'user_rosecraft', 'rosecraft@tumblers.ph', 'RoseCraft Tumblers');
+  seedRoseCraftUser(db, 'user_rosecraft', 'rosecraft@tumblers.ph', 'Solvra User');
+  seedRoseCraftUser(db, 'user_rosecraft_pfos', 'rosecraft@pfos.local', 'Solvra User');
 }
 
 export function createInMemoryPrisma() {

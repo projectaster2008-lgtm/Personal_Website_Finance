@@ -293,6 +293,66 @@ describe('Integrity checks catch broken ledgers', () => {
     const report = runIntegrity(overdrawn, '2026-09-30', SEPTEMBER);
     expect(report.issues.some((i) => i.code === 'NEGATIVE_BALANCE')).toBe(true);
   });
+
+  it('correctly reconciles RoseCraft Tumblers capital, net worth, and cash flow', () => {
+    const rcAccounts: AccountView[] = [
+      acc('gcash', 'GCash Business', 'DAILY_WALLET', 'EWALLET', 0),
+      acc('shopee', 'Shopee Wallet', 'CONVENIENCE_WALLET', 'EWALLET', 1),
+      acc('cash', 'Cash on Hand', 'DAILY_WALLET', 'CASH', 2),
+    ];
+    const rcCategories: CategoryRef[] = [
+      cat('cap', "Owner's Capital", 'EQUITY' as any, 0),
+      cat('fb', 'Product Sales - Facebook', 'INCOME', 1),
+      cat('raw', 'Raw Materials', 'EXPENSE', 2),
+    ];
+
+    // August capital + August expense + September income
+    const entries: LedgerEntryView[] = [
+      {
+        id: 'rc1', transactionId: 'rc1', date: '2026-08-15', accountId: 'gcash',
+        accountName: 'GCash Business', categoryName: "Owner's Capital", categoryId: 'cap',
+        amountMinor: 15_000_00, description: "Owner's initial capital", direction: 'IN',
+        leg: 'PRIMARY', isInternal: false, categoryKind: null, transactionType: 'CAPITAL',
+      },
+      {
+        id: 'rc2', transactionId: 'rc2', date: '2026-08-20', accountId: 'gcash',
+        accountName: 'GCash Business', categoryName: 'Raw Materials', categoryId: 'raw',
+        amountMinor: 5_000_00, description: 'August raw material purchase', direction: 'OUT',
+        leg: 'PRIMARY', isInternal: false, categoryKind: 'EXPENSE', transactionType: 'EXPENSE',
+      },
+      {
+        id: 'rc3', transactionId: 'rc3', date: '2026-09-10', accountId: 'gcash',
+        accountName: 'GCash Business', categoryName: 'Product Sales - Facebook', categoryId: 'fb',
+        amountMinor: 6_550_00, description: 'September sales', direction: 'IN',
+        leg: 'PRIMARY', isInternal: false, categoryKind: 'INCOME', transactionType: 'INCOME',
+      },
+    ];
+
+    // September statement check
+    const cf = computeCashFlow(entries, rcAccounts, rcCategories, SEPTEMBER);
+    expect(cf.openingCashMinor).toBe(10_000_00); // 15,000 - 5,000
+    expect(cf.closingCashMinor).toBe(16_550_00); // 10,000 + 6,550
+    expect(cf.netChangeInCashMinor).toBe(6_550_00);
+    expect(cf.closingCashMinor - cf.openingCashMinor).toBe(cf.netChangeInCashMinor);
+
+    const bs = computeBalanceSheet(entries, rcAccounts, [], [], rcCategories, '2026-09-30', SEPTEMBER.from);
+    expect(bs.netWorthMinor).toBe(16_550_00);
+    expect(bs.reconciliation.statementNetWorthMinor).toBe(16_550_00);
+    expect(bs.reconciliation.differenceMinor).toBe(0);
+    expect(bs.reconciliation.matches).toBe(true);
+
+    const report = checkIntegrity({
+      entries,
+      accounts: rcAccounts,
+      incomeStatement: computeIncomeStatement(entries, rcCategories, SEPTEMBER),
+      cashFlow: cf,
+      balanceSheet: bs,
+      currency: 'PHP',
+      asOf: '2026-09-30',
+    });
+    expect(report.ok).toBe(true);
+    expect(report.issues).toHaveLength(0);
+  });
 });
 
 /* -------------------------------------------------------------- planning --- */

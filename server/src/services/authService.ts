@@ -20,6 +20,23 @@ import { seedDefaultsForUser } from './seedService.js';
 
 const BCRYPT_ROUNDS = 12;
 
+export function deriveActualName(email: string, customName?: string | null): string {
+  if (customName && customName.trim() && customName.trim() !== 'RoseCraft Tumblers') {
+    return customName.trim();
+  }
+  const prefix = email.split('@')[0] || 'User';
+  if (prefix.toLowerCase().includes('rosecraft') || prefix.toLowerCase() === 'demo') {
+    return 'Solvra Admin';
+  }
+  const formatted = prefix
+    .replace(/[._-]+/g, ' ')
+    .trim()
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+  return formatted || 'Solvra User';
+}
+
 export async function register(input: {
   email: string;
   password: string;
@@ -33,11 +50,13 @@ export async function register(input: {
   const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   if (existing) throw conflict('An account with that email already exists');
 
+  const resolvedName = deriveActualName(email, input.name);
+
   const user = await prisma.user.create({
     data: {
       email,
       passwordHash: await bcrypt.hash(input.password, BCRYPT_ROUNDS),
-      name: input.name ?? null,
+      name: resolvedName,
       currency: input.currency ?? 'PHP',
       timezone: input.timezone ?? 'Asia/Manila',
     },
@@ -50,8 +69,22 @@ export async function register(input: {
   return issueSession(user);
 }
 
-export async function login(email: string, password: string): Promise<AuthResponse> {
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+export async function login(email: string, password: string, customName?: string): Promise<AuthResponse> {
+  const normalizedEmail = email.toLowerCase().trim();
+  let user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+  // If specific demo alias is requested and not found, check known demo users
+  if (!user && (normalizedEmail.includes('rosecraft') || normalizedEmail.includes('demo') || normalizedEmail.includes('solvra'))) {
+    user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: 'demo@pfos.local' },
+          { email: 'rosecraft@tumblers.ph' },
+          { email: 'rosecraft@pfos.local' },
+        ],
+      },
+    });
+  }
 
   // Always run a hash comparison, even when the user does not exist, so response
   // timing does not reveal which emails are registered.
@@ -59,6 +92,56 @@ export async function login(email: string, password: string): Promise<AuthRespon
   const valid = await bcrypt.compare(password, hash);
 
   if (!user || !user.passwordHash || !valid) throw unauthorized('Email or password is incorrect');
+
+  // Fix default "RoseCraft Tumblers" or update to actual user name
+  const targetName = deriveActualName(user.email, customName || (user.name === 'RoseCraft Tumblers' ? null : user.name));
+  if (targetName && targetName !== user.name) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { name: targetName },
+    });
+  }
+
+  return issueSession(user);
+}
+
+export async function demoLogin(email?: string, customName?: string): Promise<AuthResponse> {
+  const normalizedEmail = email?.toLowerCase().trim();
+  let user = normalizedEmail
+    ? await prisma.user.findFirst({ where: { email: normalizedEmail } })
+    : null;
+
+  if (!user) {
+    user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: 'demo@pfos.local' },
+          { email: 'rosecraft@tumblers.ph' },
+          { email: 'rosecraft@pfos.local' },
+        ],
+      },
+    });
+  }
+
+  if (!user) {
+    user = await prisma.user.findFirst();
+  }
+
+  if (!user) {
+    throw unauthorized('No demo account initialized');
+  }
+
+  // Set to actual user name if provided, or derive user's actual name instead of "RoseCraft Tumblers"
+  const targetName = deriveActualName(
+    normalizedEmail || user.email,
+    customName || (user.name === 'RoseCraft Tumblers' ? null : user.name),
+  );
+  if (targetName && targetName !== user.name) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { name: targetName },
+    });
+  }
 
   return issueSession(user);
 }

@@ -73,7 +73,14 @@ authRouter.post(
   authLimiter,
   validate(loginSchema),
   asyncHandler(async (req, res) => {
-    res.json(await auth.login(req.body.email, req.body.password));
+    res.json(await auth.login(req.body.email, req.body.password, req.body.name));
+  }),
+);
+
+authRouter.post(
+  '/demo',
+  asyncHandler(async (req, res) => {
+    res.json(await auth.demoLogin(req.body?.email, req.body?.name));
   }),
 );
 

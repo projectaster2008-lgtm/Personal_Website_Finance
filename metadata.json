@@ -1,6 +1,6 @@
 {
-  "name": "RoseCraft Tumblers",
-  "description": "Financial operating system, bookkeeping ledger, and accounting statements for RoseCraft Tumblers.",
+  "name": "Solvra",
+  "description": "Financial operating system, bookkeeping ledger, and accounting statements for Solvra. Clarity today. Prosperity tomorrow.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
