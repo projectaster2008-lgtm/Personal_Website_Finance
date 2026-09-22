@@ -19,7 +19,7 @@ import { createInMemoryPrisma } from './inMemoryPrisma.js';
 const nodeRequire =
   typeof require === 'function'
     ? require
-    : createRequire(import.meta.url);
+    : createRequire(path.resolve(process.cwd(), 'package.json'));
 
 const globalForPrisma = globalThis as unknown as { prisma?: unknown };
 

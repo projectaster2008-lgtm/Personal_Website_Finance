@@ -27,6 +27,7 @@ import { AccountsView } from './components/AccountsView';
 import { ReportsView } from './components/ReportsView';
 import { BudgetsGoalsView } from './components/BudgetsGoalsView';
 import { CategoriesAccountsSettingsView } from './components/CategoriesAccountsSettingsView';
+import { MonthlyNetIncomeChart } from './components/MonthlyNetIncomeChart';
 import { SolvraLogo } from './components/SolvraLogo';
 
 export type MainNavTab = 'DASHBOARD' | 'LEDGER' | 'ACCOUNTS' | 'REPORTS' | 'PLANNING' | 'SETTINGS';
@@ -433,6 +434,14 @@ function MainWorkspace({
                   </span>
                 </div>
               </div>
+            )}
+
+            {/* Monthly Net Income Trend Chart */}
+            {dashData && (
+              <MonthlyNetIncomeChart
+                data={dashData.trend}
+                currency={user.currency}
+              />
             )}
 
             {/* Split Panels: Where it went + Accounts Quick Glance */}

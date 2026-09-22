@@ -187,9 +187,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     const contentType = response.headers.get('content-type');
     const isJson = contentType && contentType.includes('application/json');
     const payload = isJson ? ((await response.json().catch(() => null)) as ApiError | null) : null;
+    const textBody = !isJson ? ((await response.text().catch(() => '')).trim()) : '';
     const fallbackMessage = response.status === 404
       ? 'Backend endpoint not found (404).'
-      : response.statusText || 'Request failed';
+      : (textBody && textBody.length < 200 ? textBody : '') || response.statusText || 'Request failed';
     throw new ApiRequestError(
       response.status,
       payload?.error?.code ?? 'REQUEST_FAILED',
