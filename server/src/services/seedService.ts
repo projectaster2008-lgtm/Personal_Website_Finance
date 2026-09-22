@@ -23,41 +23,22 @@ interface AccountSeed {
 /** Chart of Accounts!A6:C11 */
 export const DEFAULT_ACCOUNTS: AccountSeed[] = [
   {
-    name: 'MariBank',
-    type: 'BANK',
-    role: 'CONVENIENCE_WALLET',
-    notes:
-      'Primary account (digital version). Short-term holding and daily spending. Earns daily interest. Fully liquid.',
-  },
-  {
-    name: 'UnionBank',
-    type: 'BANK',
-    role: 'PROFESSIONAL_ANCHOR',
-    notes: 'Kept clean for future payroll, freelance income, and formal transactions.',
-  },
-  {
-    name: 'GCash',
+    name: 'GCash Business',
     type: 'EWALLET',
-    role: 'TRANSIT_STATION',
-    notes: 'Bridge only, for physical-store payments and cash-ins. Money should not sit here.',
+    role: 'DAILY_WALLET',
+    notes: 'Main digital wallet — Facebook orders, supplier payments, ads, courier fees.',
   },
   {
-    name: 'GoTyme - Emergency Fund',
-    type: 'SAVINGS',
-    role: 'VAULT',
-    notes: 'Go Save Pocket. Strict savings, not for daily spending.',
+    name: 'Shopee Wallet',
+    type: 'EWALLET',
+    role: 'CONVENIENCE_WALLET',
+    notes: 'Shopee marketplace deposits, net of nothing — commission recorded as a separate expense.',
   },
   {
-    name: 'GoTyme - Gadget Fund',
-    type: 'SAVINGS',
-    role: 'VAULT',
-    notes: 'Go Save Pocket. Strict savings, not for daily spending.',
-  },
-  {
-    name: 'Physical Wallet',
+    name: 'Cash on Hand',
     type: 'CASH',
     role: 'DAILY_WALLET',
-    notes: 'Primary account (physical version).',
+    notes: 'Market-day sales and collected COD payments.',
   },
 ];
 
@@ -68,23 +49,18 @@ interface CategorySeed {
   color: string;
 }
 
-/** Chart of Accounts!A14:B17 and A21:B26 */
 export const DEFAULT_CATEGORIES: CategorySeed[] = [
-  { name: 'Allowance', kind: 'INCOME', description: 'Regular allowance from family.', color: '#16a34a' },
-  { name: 'Freelance/Side Income', kind: 'INCOME', description: 'Freelance or gig payments.', color: '#0d9488' },
-  { name: 'Gifts Received/Scholarships', kind: 'INCOME', description: 'Cash gifts.', color: '#0891b2' },
-  { name: 'Interest Earned', kind: 'INCOME', description: 'Daily or monthly interest credited by a digital bank.', color: '#2563eb' },
-  { name: 'Food', kind: 'EXPENSE', description: 'Meals and groceries.', color: '#ea580c' },
-  { name: 'Transportation', kind: 'EXPENSE', description: 'Fares, fuel, tolls.', color: '#d97706' },
-  { name: 'Load/Subscriptions', kind: 'EXPENSE', description: 'Mobile load, app and streaming subscriptions.', color: '#7c3aed' },
-  { name: 'Shopping', kind: 'EXPENSE', description: 'Shopee and other online or offline purchases.', color: '#db2777' },
-  { name: 'Miscellaneous', kind: 'EXPENSE', description: "Anything that doesn't fit another category.", color: '#64748b' },
-  {
-    name: 'Transfer Fees',
-    kind: 'EXPENSE',
-    description: 'Fees paid to move money between your own accounts.',
-    color: '#b91c1c',
-  },
+  { name: 'Product Sales - Facebook', kind: 'INCOME', description: 'Orders taken directly through the Facebook Page.', color: '#16a34a' },
+  { name: 'Product Sales - Shopee', kind: 'INCOME', description: 'Orders through the Shopee marketplace listing.', color: '#0d9488' },
+  { name: 'Product Sales - Market/Walk-in', kind: 'INCOME', description: 'Cash sales at local markets / walk-in customers.', color: '#0891b2' },
+  { name: 'Raw Materials', kind: 'EXPENSE', description: 'Blank tumblers, vinyl, ink — physical product cost.', color: '#ea580c' },
+  { name: 'Packaging Materials', kind: 'EXPENSE', description: 'Boxes, bubble wrap, stickers used to ship orders.', color: '#d97706' },
+  { name: 'Shopee Platform Fees', kind: 'EXPENSE', description: 'Shopee commission deducted per order.', color: '#7c3aed' },
+  { name: 'Shipping Cost Paid', kind: 'EXPENSE', description: 'Courier fees paid by the shop.', color: '#db2777' },
+  { name: 'Marketing/Ads', kind: 'EXPENSE', description: 'Facebook boosts / paid promotion.', color: '#2563eb' },
+  { name: 'Supplies', kind: 'EXPENSE', description: 'Non-product business supplies such as printer ink and labels.', color: '#64748b' },
+  { name: 'Miscellaneous', kind: 'EXPENSE', description: 'Other expenses that do not fit another category.', color: '#94a3b8' },
+  { name: "Owner's Capital", kind: 'EQUITY', description: 'Money contributed by the owner. Not revenue and excluded from the Income Statement.', color: '#4f46e5' },
 ];
 
 /**

@@ -7,11 +7,12 @@
  * can never drift from each other.
  */
 
-/** Transaction type. The workbook's "Type" column allowed Income/Expense/Transfer/Fee. */
+/** Transaction type. The workbook's "Type" column allowed Income/Expense/Transfer/Fee/Capital. */
 export const TransactionType = {
   INCOME: 'INCOME',
   EXPENSE: 'EXPENSE',
   TRANSFER: 'TRANSFER',
+  CAPITAL: 'CAPITAL',
 } as const;
 export type TransactionType = (typeof TransactionType)[keyof typeof TransactionType];
 
@@ -21,11 +22,13 @@ export type TransactionType = (typeof TransactionType)[keyof typeof TransactionT
  * INTERNAL exists because the workbook used a pseudo-category called
  * "Internal Transfer" to mark rows that must be excluded from the Income
  * Statement. We keep the concept but make it structural rather than a magic string.
+ * EQUITY / CAPITAL represents owner equity contributions that affect cash and net worth without affecting operating income.
  */
 export const CategoryKind = {
   INCOME: 'INCOME',
   EXPENSE: 'EXPENSE',
   INTERNAL: 'INTERNAL',
+  EQUITY: 'EQUITY',
 } as const;
 export type CategoryKind = (typeof CategoryKind)[keyof typeof CategoryKind];
 

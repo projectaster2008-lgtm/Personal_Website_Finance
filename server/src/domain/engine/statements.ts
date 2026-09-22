@@ -53,8 +53,14 @@ export function computeCashFlow(
 
   const openingBalances = computeAccountBalances(accounts, entries, previousDay(period.from));
   const closingBalances = computeAccountBalances(accounts, entries, period.to);
-  const openingCashMinor = computeTotalCash(openingBalances);
+  let openingCashMinor = computeTotalCash(openingBalances);
   const closingCashMinor = computeTotalCash(closingBalances);
+
+  // Capital contributed on or before period.from that represents starting owner capital:
+  const capitalAtStart = entries
+    .filter((e) => (e.transactionType === 'CAPITAL' || e.categoryName === "Owner's Capital") && e.date <= period.from)
+    .reduce((s, e) => s + e.amountMinor, 0);
+  openingCashMinor += capitalAtStart;
 
   const totalMovedToSavingsMinor = lines.reduce((s, l) => s + l.movedInMinor, 0);
 
@@ -181,7 +187,11 @@ export function computeChangesInNetWorth(
     .filter((a) => strictlyBefore(a.date, period.from))
     .reduce((s, a) => s + a.amountMinor, 0);
 
-  const beginningNetWorthMinor = openingCash - openingLiabilities + priorAdjustments;
+  const capitalAtStart = entries
+    .filter((e) => (e.transactionType === 'CAPITAL' || e.categoryName === "Owner's Capital") && e.date <= period.from)
+    .reduce((s, e) => s + e.amountMinor, 0);
+
+  const beginningNetWorthMinor = openingCash + capitalAtStart - openingLiabilities + priorAdjustments;
 
   const statement = computeIncomeStatement(entries, categories, period);
 

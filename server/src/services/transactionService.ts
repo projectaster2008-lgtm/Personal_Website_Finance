@@ -97,7 +97,7 @@ function buildWhere(userId: string, query: TransactionQuery): Prisma.Transaction
       ...(query.to ? { lte: toDateColumn(query.to) } : {}),
     };
   }
-  if (query.type) where.type = query.type;
+  if (query.type) where.type = query.type as any;
   if (query.categoryId) where.categoryId = query.categoryId;
   if (query.tag) where.tags = { has: query.tag };
 

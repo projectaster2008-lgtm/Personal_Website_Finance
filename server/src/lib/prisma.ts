@@ -12,10 +12,14 @@
  * Requiring it lazily means the in-memory path never touches the generated
  * client at all, and the try/catch fallback below can actually do its job.
  */
+import path from 'node:path';
 import { createRequire } from 'node:module';
 import { createInMemoryPrisma } from './inMemoryPrisma.js';
 
-const require = createRequire(import.meta.url);
+const nodeRequire =
+  typeof require === 'function'
+    ? require
+    : createRequire(path.join(process.cwd(), 'package.json'));
 
 const globalForPrisma = globalThis as unknown as { prisma?: unknown };
 
@@ -23,7 +27,7 @@ function initializePrisma(): unknown {
   if (process.env.USE_REAL_POSTGRES === 'true') {
     try {
       console.log('[Prisma] Connecting to PostgreSQL…');
-      const { PrismaClient } = require('@prisma/client') as { PrismaClient: new () => unknown };
+      const { PrismaClient } = nodeRequire('@prisma/client') as { PrismaClient: new () => unknown };
       return new PrismaClient();
     } catch (error) {
       console.warn(

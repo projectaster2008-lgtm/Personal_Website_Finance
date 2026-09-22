@@ -112,7 +112,7 @@ export function checkIntegrity(input: IntegrityInput): IntegrityReport {
 
   /* 5. Category kind vs entry direction ------------------------------------- */
   for (const entry of input.entries) {
-    if (entry.isInternal || !entry.categoryKind) continue;
+    if (entry.isInternal || !entry.categoryKind || entry.categoryKind === 'EQUITY' || entry.transactionType === 'CAPITAL') continue;
     const expected = entry.direction === 'IN' ? 'INCOME' : 'EXPENSE';
     if (entry.categoryKind !== expected) {
       issues.push({

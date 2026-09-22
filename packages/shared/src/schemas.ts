@@ -200,9 +200,16 @@ function differentAccounts(
 
 export const createTransferSchema = transferObjectSchema.superRefine(differentAccounts);
 
+export const createCapitalSchema = z.object({
+  ...transactionBase,
+  type: z.literal(TransactionType.CAPITAL),
+  accountId: cuidLike,
+  categoryId: cuidLike.optional().nullable(),
+});
+
 /** Discriminated union: the shape of the payload depends on the type field. */
 export const createTransactionSchema = z
-  .discriminatedUnion('type', [createIncomeSchema, createExpenseSchema, transferObjectSchema])
+  .discriminatedUnion('type', [createIncomeSchema, createExpenseSchema, transferObjectSchema, createCapitalSchema])
   .superRefine(differentAccounts);
 
 /** Updates replace the whole transaction, so the same union applies. */

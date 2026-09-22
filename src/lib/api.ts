@@ -370,9 +370,52 @@ export const api = {
     link.click();
     URL.revokeObjectURL(url);
   },
+
+  /* Accounts Receivable */
+  listAccountsReceivable: (): Promise<AccountsReceivableDto[]> =>
+    request<AccountsReceivableDto[]>('/accounts-receivable'),
+
+  createAccountsReceivable: (input: CreateAccountsReceivableInput): Promise<AccountsReceivableDto> =>
+    request<AccountsReceivableDto>('/accounts-receivable', {
+      method: 'POST',
+      body: input,
+    }),
+
+  updateAccountsReceivable: (id: string, input: Partial<CreateAccountsReceivableInput>): Promise<AccountsReceivableDto> =>
+    request<AccountsReceivableDto>(`/accounts-receivable/${id}`, {
+      method: 'PATCH',
+      body: input,
+    }),
+
+  deleteAccountsReceivable: (id: string): Promise<void> =>
+    request<void>(`/accounts-receivable/${id}`, {
+      method: 'DELETE',
+    }),
 };
 
 /* ---------------------------------------------- types the API adds on top --- */
+
+export interface AccountsReceivableDto {
+  id: string;
+  userId: string;
+  orderDate: string;
+  customer: string;
+  units: number;
+  amountMinor: number;
+  status: 'Pending' | 'Collected' | string;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAccountsReceivableInput {
+  orderDate: string;
+  customer: string;
+  units: number;
+  amountMinor: number;
+  status?: string;
+  note?: string;
+}
 
 /** Shape returned by `GET /accounts/:id`. */
 export interface AccountDetail {

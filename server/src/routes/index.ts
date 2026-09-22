@@ -594,4 +594,60 @@ api.get(
   }),
 );
 
+/* accounts receivable */
+api.get(
+  '/accounts-receivable',
+  asyncHandler(async (req, res) => {
+    const user = currentUser(req);
+    const items = await prisma.accountsReceivable.findMany({
+      where: { userId: user.id },
+      orderBy: { orderDate: 'desc' },
+    });
+    res.json(items);
+  }),
+);
+
+api.post(
+  '/accounts-receivable',
+  asyncHandler(async (req, res) => {
+    const user = currentUser(req);
+    const { orderDate, customer, units, amountMinor, status, note } = req.body;
+    const item = await prisma.accountsReceivable.create({
+      data: {
+        userId: user.id,
+        orderDate,
+        customer,
+        units: Number(units),
+        amountMinor: Number(amountMinor),
+        status: status || 'Pending',
+        note: note || '',
+      },
+    });
+    res.status(201).json(item);
+  }),
+);
+
+api.patch(
+  '/accounts-receivable/:id',
+  asyncHandler(async (req, res) => {
+    const id = param(req, 'id');
+    const item = await prisma.accountsReceivable.update({
+      where: { id },
+      data: req.body,
+    });
+    res.json(item);
+  }),
+);
+
+api.delete(
+  '/accounts-receivable/:id',
+  asyncHandler(async (req, res) => {
+    const id = param(req, 'id');
+    await prisma.accountsReceivable.delete({
+      where: { id },
+    });
+    res.status(204).end();
+  }),
+);
+
 router.use('/', api);

@@ -1,6 +1,6 @@
 {
-  "name": "Personal Finance OS",
-  "description": "A personal financial operating system rebuilt from a spreadsheet with automated ledger reconciliation, financial statements, and dashboards.",
+  "name": "RoseCraft Tumblers",
+  "description": "Financial operating system, bookkeeping ledger, and accounting statements for RoseCraft Tumblers.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

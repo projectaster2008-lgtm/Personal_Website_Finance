@@ -117,5 +117,9 @@ export function onOrBefore(date: string, boundary: string): boolean {
  * but driven by the structural `isInternal` flag instead of a category name.
  */
 export function isOperating(entry: LedgerEntryView): boolean {
-  return !entry.isInternal;
+  if (entry.isInternal) return false;
+  if (entry.transactionType === 'CAPITAL') return false;
+  if (entry.categoryKind === 'EQUITY') return false;
+  if (entry.categoryName === "Owner's Capital") return false;
+  return true;
 }

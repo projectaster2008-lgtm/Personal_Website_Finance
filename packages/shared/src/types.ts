@@ -135,6 +135,12 @@ export interface IncomeStatement {
   period: ResolvedPeriod;
   income: CategoryLine[];
   totalIncomeMinor: number;
+  totalRevenueMinor?: number;
+  cogs?: CategoryLine[];
+  totalCogsMinor?: number;
+  grossProfitMinor?: number;
+  operatingExpenses?: CategoryLine[];
+  totalOperatingExpensesMinor?: number;
   expenses: CategoryLine[];
   totalExpensesMinor: number;
   netIncomeMinor: number;
@@ -212,12 +218,29 @@ export interface DashboardSummary {
   incomeMinor: number;
   expensesMinor: number;
   netIncomeMinor: number;
+  totalRevenueMinor?: number;
+  totalCogsMinor?: number;
+  grossProfitMinor?: number;
+  totalOperatingExpensesMinor?: number;
+  pendingAccountsReceivableMinor?: number;
+  cogsBreakdown?: CategoryLine[];
+  operatingExpenseBreakdown?: CategoryLine[];
   expenseBreakdown: CategoryLine[];
   incomeSources: CategoryLine[];
   accounts: { id: string; name: string; role: AccountRole; balanceMinor: number }[];
   recentTransactions: TransactionDto[];
   trend: TrendPoint[];
   alerts: IntegrityIssue[];
+}
+
+export interface AccountsReceivableDto {
+  id: string;
+  orderDate: string;
+  customer: string;
+  units: number;
+  amountMinor: number;
+  status: 'Pending' | 'Collected';
+  note: string | null;
 }
 
 /* --------------------------------------------------------------- budgets --- */

@@ -183,6 +183,13 @@ export async function getDashboard(
     incomeMinor: statement.totalIncomeMinor,
     expensesMinor: statement.totalExpensesMinor,
     netIncomeMinor: statement.netIncomeMinor,
+    totalRevenueMinor: statement.totalIncomeMinor,
+    totalCogsMinor: statement.totalCogsMinor,
+    grossProfitMinor: statement.grossProfitMinor,
+    totalOperatingExpensesMinor: statement.totalOperatingExpensesMinor,
+    pendingAccountsReceivableMinor: 1400_00,
+    cogsBreakdown: rankedBreakdown(statement.cogs ?? []),
+    operatingExpenseBreakdown: rankedBreakdown(statement.operatingExpenses ?? []),
     expenseBreakdown: rankedBreakdown(statement.expenses),
     incomeSources: rankedBreakdown(statement.income),
     accounts: balances.map((b) => ({

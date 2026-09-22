@@ -35,6 +35,11 @@ interface Bucket {
   count: number;
 }
 
+export function isCogsCategory(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return normalized === 'raw materials' || normalized === 'packaging materials';
+}
+
 export function computeIncomeStatement(
   entries: readonly LedgerEntryView[],
   categories: readonly CategoryRef[],
@@ -73,10 +78,22 @@ export function computeIncomeStatement(
   const totalIncomeMinor = income.reduce((s, l) => s + l.amountMinor, 0);
   const totalExpensesMinor = expenses.reduce((s, l) => s + l.amountMinor, 0);
 
+  const cogs = expenses.filter((l) => isCogsCategory(l.name));
+  const operatingExpenses = expenses.filter((l) => !isCogsCategory(l.name));
+  const totalCogsMinor = cogs.reduce((s, l) => s + l.amountMinor, 0);
+  const totalOperatingExpensesMinor = operatingExpenses.reduce((s, l) => s + l.amountMinor, 0);
+  const grossProfitMinor = totalIncomeMinor - totalCogsMinor;
+
   return {
     period,
     income: withPercent(income, totalIncomeMinor),
     totalIncomeMinor,
+    totalRevenueMinor: totalIncomeMinor,
+    cogs: withPercent(cogs, totalCogsMinor),
+    totalCogsMinor,
+    grossProfitMinor,
+    operatingExpenses: withPercent(operatingExpenses, totalOperatingExpensesMinor),
+    totalOperatingExpensesMinor,
     expenses: withPercent(expenses, totalExpensesMinor),
     totalExpensesMinor,
     netIncomeMinor: totalIncomeMinor - totalExpensesMinor,

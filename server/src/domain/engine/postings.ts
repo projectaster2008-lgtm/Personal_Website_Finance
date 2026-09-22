@@ -77,6 +77,20 @@ export function buildPostings(input: PostingInput): PostingDraft[] {
       ];
     }
 
+    case 'CAPITAL': {
+      requireAccount(input.accountId, 'accountId');
+      return [
+        {
+          accountId: input.accountId!,
+          amountMinor: input.amountMinor,
+          direction: 'IN',
+          leg: 'PRIMARY',
+          categoryId: input.categoryId ?? null,
+          isInternal: false,
+        },
+      ];
+    }
+
     case 'TRANSFER': {
       requireAccount(input.fromAccountId, 'fromAccountId');
       requireAccount(input.toAccountId, 'toAccountId');
